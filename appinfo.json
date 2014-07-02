@@ -1,0 +1,35 @@
+{
+    "appKeys": {},
+    "capabilities": [
+        "configurable"
+    ],
+    "companyName": "guschdel soft",
+    "longName": "gTime Watchface",
+    "resources": {
+        "media": [
+            {
+                "file": "images/icon.png",
+                "menuIcon": true,
+                "name": "IMG_MENU_ICON",
+                "type": "png"
+            },
+            {
+                "file": "images/arrow_down.png",
+                "name": "IMG_ARROW_DOWN",
+                "type": "png"
+            },
+            {
+                "file": "images/arrow_up.png",
+                "name": "IMG_ARROW_UP",
+                "type": "png"
+            }
+        ]
+    },
+    "shortName": "gTime",
+    "uuid": "cf727ee6-24a2-4860-a92c-c9a5befed85c",
+    "versionCode": 1,
+    "versionLabel": "1.0.1",
+    "watchapp": {
+        "watchface": true
+    }
+}
