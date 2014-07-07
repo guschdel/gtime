@@ -8,6 +8,16 @@
     "resources": {
         "media": [
             {
+                "file": "images/bt_con_dis.png",
+                "name": "IMG_BT_DIS",
+                "type": "png"
+            },
+            {
+                "file": "images/bt_con.png",
+                "name": "IMG_BT_CON",
+                "type": "png"
+            },
+            {
                 "file": "images/icon.png",
                 "menuIcon": true,
                 "name": "IMG_MENU_ICON",

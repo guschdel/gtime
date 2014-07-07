@@ -1,17 +1,22 @@
 #include <pebble.h>
 #include "gTime.h"
+
 static Window *window;
 static TextLayer *wday_layer;
 static TextLayer *date_layer;
 static TextLayer *time_layer;
+static TextLayer *sec_layer;
 static TextLayer *week_layer;
 static TextLayer *right_info_layer;
 static TextLayer *left_info_layer;
 static GBitmap *batt_state_unload;
 static GBitmap *batt_state_load;
-static BitmapLayer *img_layer;
-//static InverterLayer *inv_img_layer;
+static GBitmap *bt_state_con;
+static GBitmap *bt_state_dis;
+static BitmapLayer *img_right_info_layer;
+static BitmapLayer *img_left_info_layer;
 static uint16_t tofd = 25; // tofd als Zahl fuer spaeter
+static bool first_run = true; // Zur Initialisierung, am Ende von init auf false setzen
 
 // h = 168 | w = 144
 
@@ -24,6 +29,8 @@ void make_date(char **datum){
 
   app_log(APP_LOG_LEVEL_DEBUG, __FILE__, __LINE__, "Datum %d %d", wday, mon);
 
+  // Hier wird mit Absicht kein strncpy benutzt, da datum[] an der Stelle
+  // zu wenig Zeichen enthaelt. Spaeter werden 11 Zeichen benoetigt, wie reserviert wurden!
   strcpy(datum[1], weekday[wday]);
   strcpy(datum[2], month[mon - 1]);
    
@@ -34,24 +41,52 @@ void handle_battery(BatteryChargeState batt) {
 
   if(batt.is_charging){
     snprintf(batt_text, sizeof(batt_text), "%d%%", batt.charge_percent);
-    bitmap_layer_set_bitmap(img_layer, batt_state_load);
+    bitmap_layer_set_bitmap(img_right_info_layer, batt_state_load);
   }
   else {
     snprintf(batt_text, sizeof(batt_text), "%d%%", batt.charge_percent);
-    bitmap_layer_set_bitmap(img_layer, batt_state_unload);
+    bitmap_layer_set_bitmap(img_right_info_layer, batt_state_unload);
   }
 
   text_layer_set_text(right_info_layer, batt_text);
 
 }
 
+void handle_connection(bool con) {
+  
+  if(con) {
+    bitmap_layer_set_bitmap(img_left_info_layer, bt_state_con);
+    if(!first_run) {
+      vibes_double_pulse();
+    }
+  }
+  else {
+    bitmap_layer_set_bitmap(img_left_info_layer, bt_state_dis);
+    if(!first_run) {
+      vibes_long_pulse();
+    }
+  }
+}
+
+void handle_second_tick(struct tm *time_tick, TimeUnits units_changed) {
+  static char sec_text[] = "00";
+  if(!time_tick) {
+    time_t now = time(NULL);
+    time_tick = localtime(&now);
+  }
+  
+  strftime(sec_text, sizeof(sec_text), "%S", time_tick);
+  text_layer_set_text(sec_layer, sec_text);
+}
+
 void handle_minute_tick(struct tm *time_tick, TimeUnits units_changed) {
   static char time_text[] = "00:00";
+  static char sec_text[] = "00";
   static char date_text[] = "00. Xxxxxxxxx";
-  static char week_text[] = "Woche 00";
+  static char week_text[] = "KW 00";
   static char h[] = "00";
   static char wday[11];
-  static char week_format[] = "Woche %V";
+  static char week_format[] = "KW %V";
   char *time_format;
   char **datum; 
   uint16_t i = 0;
@@ -69,6 +104,8 @@ void handle_minute_tick(struct tm *time_tick, TimeUnits units_changed) {
     time_format = "%I:%M";
   }
   
+  strftime(sec_text, sizeof(sec_text), "%S", time_tick);
+  text_layer_set_text(sec_layer, sec_text);
 
   strftime(time_text, sizeof(time_text), time_format, time_tick);
   text_layer_set_text(time_layer, time_text);
@@ -108,10 +145,10 @@ void handle_minute_tick(struct tm *time_tick, TimeUnits units_changed) {
   
     app_log(APP_LOG_LEVEL_DEBUG, __FILE__, __LINE__, "Datum gebaut %s %s %s!", datum[0], datum[1], datum[2]);
     
-    strcpy(date_text, datum[0]);  // Tag im Monat
-    strcat(date_text, ". ");
-    strcat(date_text, datum[2]);  // Monat in Worten
-    strcpy(wday, datum[1]);       // Wochentag
+    strncpy(date_text, datum[0], sizeof(date_text));  // Tag im Monat
+    strncat(date_text, ". ", sizeof(date_text));
+    strncat(date_text, datum[2], sizeof(date_text));  // Monat in Worten
+    strncpy(wday, datum[1], sizeof(wday));       // Wochentag
   
     app_log(APP_LOG_LEVEL_DEBUG, __FILE__, __LINE__, "Datum: %s, %s!", wday, date_text); 
   
@@ -154,24 +191,31 @@ void init(void) {
 
   app_log(APP_LOG_LEVEL_DEBUG, __FILE__, __LINE__, "Datum Layer gebaut! %d %d", bounds.size.h, bounds.size.w);
 
-  time_layer = text_layer_create(GRect(0, 59, bounds.size.w, 50));
+  time_layer = text_layer_create(GRect(0, 55, bounds.size.w, 50));
   text_layer_set_background_color(time_layer, GColorBlack);
   text_layer_set_text_color(time_layer, GColorWhite);
-  text_layer_set_font(time_layer, fonts_get_system_font(FONT_KEY_BITHAM_34_MEDIUM_NUMBERS));
+  text_layer_set_font(time_layer, fonts_get_system_font(FONT_KEY_BITHAM_42_MEDIUM_NUMBERS));
   text_layer_set_text_alignment(time_layer, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(time_layer));
 
+  sec_layer = text_layer_create(GRect(0, 100, bounds.size.w, 20));
+  text_layer_set_background_color(sec_layer, GColorBlack);
+  text_layer_set_text_color(sec_layer, GColorWhite);
+  text_layer_set_font(sec_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
+  text_layer_set_text_alignment(sec_layer, GTextAlignmentCenter);
+  layer_add_child(window_layer, text_layer_get_layer(sec_layer));
+  
   app_log(APP_LOG_LEVEL_DEBUG, __FILE__, __LINE__, "Uhrzeit Layer gebaut!");
   
-  week_layer = text_layer_create(GRect(0, 110, bounds.size.w, 30));
+  week_layer = text_layer_create(GRect(0, 120, bounds.size.w, 30));
   text_layer_set_background_color(week_layer, GColorBlack);
   text_layer_set_text_color(week_layer, GColorWhite);
-  text_layer_set_font(week_layer, fonts_get_system_font(FONT_KEY_ROBOTO_CONDENSED_21));
+  text_layer_set_font(week_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
   text_layer_set_text_alignment(week_layer, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(week_layer));
   
   // Infozeile unten links
-  left_info_layer = text_layer_create(GRect(0, (bounds.size.h - 20), (bounds.size.w / 2), 20));
+  left_info_layer = text_layer_create(GRect(21, (bounds.size.h - 20), (bounds.size.w / 2), 20));
   text_layer_set_background_color(left_info_layer, GColorBlack);
   text_layer_set_font(left_info_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
   text_layer_set_text_color(left_info_layer, GColorWhite);
@@ -190,27 +234,48 @@ void init(void) {
   batt_state_load = gbitmap_create_with_resource(RESOURCE_ID_IMG_ARROW_UP);
   batt_state_unload = gbitmap_create_with_resource(RESOURCE_ID_IMG_ARROW_DOWN);
   
-  // Layer für das Bild links unten bauen
-  img_layer = bitmap_layer_create(GRect(bounds.size.w - 20, bounds.size.h - 20, 20, 20));
-  bitmap_layer_set_bitmap(img_layer, batt_state_load);
-  layer_add_child(window_layer, bitmap_layer_get_layer(img_layer));
+  // Icon fuer den Bluetooth Verbindungszustand
+  bt_state_con = gbitmap_create_with_resource(RESOURCE_ID_IMG_BT_CON);
+  bt_state_dis = gbitmap_create_with_resource(RESOURCE_ID_IMG_BT_DIS);
   
-  tick_timer_service_subscribe(MINUTE_UNIT, handle_minute_tick);
+  // Layer für das Bild links unten bauen
+  img_left_info_layer = bitmap_layer_create(GRect(0, bounds.size.h - 20, 20, 20));
+  bitmap_layer_set_bitmap(img_left_info_layer, bt_state_con);
+  layer_add_child(window_layer, bitmap_layer_get_layer(img_left_info_layer));
+  
+  
+  // Layer für das Bild rechts unten bauen
+  img_right_info_layer = bitmap_layer_create(GRect(bounds.size.w - 20, bounds.size.h - 20, 20, 20));
+  bitmap_layer_set_bitmap(img_right_info_layer, batt_state_load);
+  layer_add_child(window_layer, bitmap_layer_get_layer(img_right_info_layer));
+  
+  tick_timer_service_subscribe(SECOND_UNIT, handle_minute_tick);
+  //tick_timer_service_subscribe(SECOND_UNIT, handle_second_tick);
   battery_state_service_subscribe(&handle_battery);
+  bluetooth_connection_service_subscribe(&handle_connection);
   handle_minute_tick(NULL, MINUTE_UNIT);
+  //handle_second_tick(NULL, SECOND_UNIT);
   handle_battery(battery_state_service_peek());
+  handle_connection(bluetooth_connection_service_peek());
+  
+  first_run = false;
 }
 
 void deinit(void) {
   tick_timer_service_unsubscribe();
   battery_state_service_unsubscribe();
+  bluetooth_connection_service_unsubscribe();
   text_layer_destroy(date_layer);
   text_layer_destroy(time_layer);
+  text_layer_destroy(sec_layer);
   text_layer_destroy(week_layer);
   text_layer_destroy(left_info_layer);
   gbitmap_destroy(batt_state_load);
   gbitmap_destroy(batt_state_unload);
-  bitmap_layer_destroy(img_layer);
+  gbitmap_destroy(bt_state_con);
+  gbitmap_destroy(bt_state_dis);
+  bitmap_layer_destroy(img_right_info_layer);
+  bitmap_layer_destroy(img_left_info_layer);
   window_destroy(window);
 }
 
