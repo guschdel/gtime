@@ -5,6 +5,7 @@
     ],
     "companyName": "guschdel soft",
     "longName": "gTime Watchface",
+    "projectType": "native",
     "resources": {
         "media": [
             {

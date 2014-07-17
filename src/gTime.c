@@ -113,7 +113,7 @@ void handle_minute_tick(struct tm *time_tick, TimeUnits units_changed) {
   strftime(h, sizeof(h), "%H", time_tick);
   t = atoi(h);  
 
-  if(tofd > t) { // Wenn der Tag neu anfaengt, dann Datum lesen...
+  if(tofd < t) { // Wenn der Tag neu anfaengt, dann Datum lesen...
 
     tofd = t;
   
