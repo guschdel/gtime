@@ -15,7 +15,7 @@ static GBitmap *bt_state_con;
 static GBitmap *bt_state_dis;
 static BitmapLayer *img_right_info_layer;
 static BitmapLayer *img_left_info_layer;
-static uint16_t tofd = 25; // tofd als Zahl fuer spaeter
+static int8_t tofd = -1; // tofd als Zahl fuer spaeter
 static bool first_run = true; // Zur Initialisierung, am Ende von init auf false setzen
 
 // h = 168 | w = 144
@@ -84,7 +84,7 @@ void handle_minute_tick(struct tm *time_tick, TimeUnits units_changed) {
   static char sec_text[] = "00";
   static char date_text[] = "00. Xxxxxxxxx";
   static char week_text[] = "KW 00";
-  static char h[] = "00";
+  static char d[] = "00";
   static char wday[11];
   static char week_format[] = "KW %V";
   char *time_format;
@@ -110,10 +110,10 @@ void handle_minute_tick(struct tm *time_tick, TimeUnits units_changed) {
   strftime(time_text, sizeof(time_text), time_format, time_tick);
   text_layer_set_text(time_layer, time_text);
 
-  strftime(h, sizeof(h), "%H", time_tick);
-  t = atoi(h);  
+  strftime(d, sizeof(d), "%d", time_tick);
+  t = atoi(d);  
 
-  if(tofd < t) { // Wenn der Tag neu anfaengt, dann Datum lesen...
+  if(tofd != t) { // only if the day changes, then we re-read the date
 
     tofd = t;
   
